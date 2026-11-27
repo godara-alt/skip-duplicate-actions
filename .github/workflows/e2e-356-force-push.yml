@@ -1,0 +1,35 @@
+name: Live force-push regression test for issue 356
+on:
+  push:
+    branches:
+      - test/356-force-push-live
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  verify-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hold original run open for the force-push race
+        if: contains(github.event.head_commit.message, 'e2e-initial')
+        run: sleep 120
+      - uses: actions/checkout@v4
+      - name: Run actual skip-duplicate action
+        id: gate
+        uses: ./
+        with:
+          concurrent_skipping: same_content_newer
+          skip_after_successful_duplicate: 'false'
+          cancel_others: 'false'
+          do_not_skip: '[]'
+          skip_summary: 'true'
+      - name: Confirm required validation was not skipped
+        env:
+          SHOULD_SKIP: ${{ steps.gate.outputs.should_skip }}
+          REASON: ${{ steps.gate.outputs.reason }}
+          RUN_NUMBER: ${{ github.run_number }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          echo "RUN_NUMBER=$RUN_NUMBER CURRENT_SHA=$CURRENT_SHA SHOULD_SKIP=$SHOULD_SKIP REASON=$REASON"
+          test "$SHOULD_SKIP" = "false"
